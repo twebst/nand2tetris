@@ -1,0 +1,31 @@
+// Do all 4 combinations of zeroing and noting the input, then select one
+// Used in ALU
+
+CHIP ZeroAndNot16 {
+    IN in[16], z, n;
+    OUT out[16];
+
+    PARTS:
+	// Possible operation combinations 01, 10, and 11
+	/*
+	 * Zero16(in=in, out=zeroin);
+	 * Not16(in=in, out=notin);
+	 * Not16(in=zeroin, out=notzeroin);
+	 */
+
+	/*
+	 * 00 => in
+	 * 01 => zero in
+	 * 10 => not in
+	 * 11 => ~(zero in)
+	 */
+	// Mux4Way16(a=in, b=zeroin, c=notin, d=notzeroin, sel=sel, out=out);
+
+	// First zero check
+	Zero16(in=in, out=zout);
+	Mux16(a=in, b=zout, sel=z, out=nin);
+
+	// Not check
+	Not16(in=nin, out=nzout);
+	Mux16(a=nin, b=nzout, sel=n, out=out);
+}

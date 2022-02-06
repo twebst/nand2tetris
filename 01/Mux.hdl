@@ -1,0 +1,26 @@
+// This file is part of www.nand2tetris.org
+// and the book "The Elements of Computing Systems"
+// by Nisan and Schocken, MIT Press.
+// File name: projects/01/Mux.hdl
+
+/** 
+ * Multiplexor:
+ * out = a if sel == 0
+ *       b otherwise
+ */
+
+/**
+ * Canonical Representation in Minterms, oring those with an output of 1.
+ * Then do some factoring for (a + a') and (b + b') which a tautological.
+ */
+
+CHIP Mux {
+    IN a, b, sel;
+    OUT out;
+
+    PARTS:
+	Not(in=sel, out=aand);
+	And(a=a, b=aand, out=ora);
+	And(a=b, b=sel, out=orb);
+	Or(a=ora, b=orb, out=out);
+}
