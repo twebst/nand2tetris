@@ -1,0 +1,9 @@
+// Zero all bits
+
+CHIP Zero16 {
+    IN in[16];
+    OUT out[16];
+
+    PARTS:
+	Xor16(a=in, b=in, out=out);
+}
