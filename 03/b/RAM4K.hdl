@@ -15,16 +15,16 @@ CHIP RAM4K {
     OUT out[16];
 
     PARTS:
-	DMux8Way(in=load, sel=address[0..2],
+	DMux8Way(in=load, sel=address[9..11],
 			 a=ao, b=bo, c=co, d=do, e=eo, f=fo, g=go, h=ho);
-	RAM512(in=in, load=ao, address=address[3..11], out=raout);
-	RAM512(in=in, load=bo, address=address[3..11], out=rbout);
-	RAM512(in=in, load=co, address=address[3..11], out=rcout);
-	RAM512(in=in, load=do, address=address[3..11], out=rdout);
-	RAM512(in=in, load=eo, address=address[3..11], out=reout);
-	RAM512(in=in, load=fo, address=address[3..11], out=rfout);
-	RAM512(in=in, load=go, address=address[3..11], out=rgout);
-	RAM512(in=in, load=ho, address=address[3..11], out=rhout);
+	RAM512(in=in, load=ao, address=address[0..8], out=raout);
+	RAM512(in=in, load=bo, address=address[0..8], out=rbout);
+	RAM512(in=in, load=co, address=address[0..8], out=rcout);
+	RAM512(in=in, load=do, address=address[0..8], out=rdout);
+	RAM512(in=in, load=eo, address=address[0..8], out=reout);
+	RAM512(in=in, load=fo, address=address[0..8], out=rfout);
+	RAM512(in=in, load=go, address=address[0..8], out=rgout);
+	RAM512(in=in, load=ho, address=address[0..8], out=rhout);
 	Mux8Way16(a=raout, b=rbout, c=rcout, d=rdout, e=reout, f=rfout,
-			  g=rgout, h=rhout, sel=address[0..2], out=out);
+			  g=rgout, h=rhout, sel=address[9..11], out=out);
 }

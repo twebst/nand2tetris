@@ -39,5 +39,46 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
-    // Put your code here:
+    // Mux16 feeds either the instruction, or ALU out into the A reg (when load is set)
+    // instructions starting with 0 are a constant load (i.e. @const), 1 is (probably) a c-instruction
+    Mux16(a=instruction, b=aluout, sel=instruction[15], out=aregin);
+
+    // REGISTERS:
+    // A-Register, THIS LOAD MIGHT BE WRONG
+    Register(in=aregin, load=instruction[5], out=aregout);
+
+    // D-Register
+    Register(in=aluout, load=instruction[4], out=dregout);
+
+    // Program Counter
+    Not(in=jump, out=notjump);
+    PC(in=aregout, load=jump, inc=notjump, reset=reset);
+
+    // ALU:
+    // Select between memory and a register inputs, given the a flag (instruction[12])
+    Mux16(a=aregout, b=inM, sel=instruction[12], out=aluyin);
+    // six c's correspond to ins flags below
+    ALU(x=dregout,
+	y=aluyin,
+	zx=instruction[11],
+	nx=instruction[10],
+	zy=instruction[9],
+	ny=instruction[8],
+	f=instruction[7],
+	no=instruction[6],
+	out=outM,
+	out=aluout,
+	zr=zr,
+	ng=ng);
+
+    // Jump logic/circuit:
+    // <= 0?
+    Or(a=zr, b=ng, out=zorn);
+    // > 0?
+    Not(in=zorn, out=pos);
+    // >= 0?
+    Not(in=ng, out=notng);
+    // ne 0?
+    Not(in=zr, out=notzr);
+    // Mux8Way(a=false, b=pos, c=zr, d=notng, e=ng, f=notzr, g=zorn, h=true, sel=instruction[0..2], out=jump);
 }
