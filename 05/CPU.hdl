@@ -39,20 +39,23 @@ CHIP CPU {
         pc[15];          // address of next instruction
 
     PARTS:
+    // d[0] = instruction[3] goes out to writeM when its a c-instruction (instruction[15] = 0)
+    Mux(a=false, b=instruction[3], sel=instruction[15], out=writeM);
+
     // Mux16 feeds either the instruction, or ALU out into the A reg (when load is set)
     // instructions starting with 0 are a constant load (i.e. @const), 1 is (probably) a c-instruction
     Mux16(a=instruction, b=aluout, sel=instruction[15], out=aregin);
 
-    // REGISTERS:
-    // A-Register, THIS LOAD MIGHT BE WRONG
-    Register(in=aregin, load=instruction[5], out=aregout);
+    // REGISTERS: Like writeM above, make sure to ignore "loads" when it's an a-instruction (unless it's the a-register)
+    Mux(a=false, b=instruction[4], sel=instruction[15], out=dload);
+    DRegister(in=aluout, load=dload, out=dregout);
 
-    // D-Register
-    Register(in=aluout, load=instruction[4], out=dregout);
+    Mux(a=true, b=instruction[5], sel=instruction[15], out=aload);
+    ARegister(in=aregin, load=aload, out=aregout, out[0..14]=addressM);
 
-    // Program Counter
-    Not(in=jump, out=notjump);
-    PC(in=aregout, load=jump, inc=notjump, reset=reset);
+    Mux(a=false, b=jump, sel=instruction[15], out=pcjump);
+    Not(in=pcjump, out=notjump);
+    PC(in=aregout, load=pcjump, inc=notjump, reset=reset, out[0..14]=pc);
 
     // ALU:
     // Select between memory and a register inputs, given the a flag (instruction[12])
@@ -74,11 +77,24 @@ CHIP CPU {
     // Jump logic/circuit:
     // <= 0?
     Or(a=zr, b=ng, out=zorn);
+
     // > 0?
     Not(in=zorn, out=pos);
+
     // >= 0?
     Not(in=ng, out=notng);
+
     // ne 0?
     Not(in=zr, out=notzr);
-    // Mux8Way(a=false, b=pos, c=zr, d=notng, e=ng, f=notzr, g=zorn, h=true, sel=instruction[0..2], out=jump);
+
+    // Building an 8-way mux
+    Mux(a=false, b=pos, sel=instruction[0], out=outa);
+    Mux(a=zr, b=notng, sel=instruction[0], out=outb);
+    Mux(a=outa, b=outb, sel=instruction[1], out=oute);
+
+    Mux(a=ng, b=notzr, sel=instruction[0], out=outc);
+    Mux(a=zorn, b=true, sel=instruction[0], out=outd);
+    Mux(a=outc, b=outd, sel=instruction[1], out=outf);
+
+    Mux(a=oute, b=outf, sel=instruction[2], out=jump);
 }
