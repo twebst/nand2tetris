@@ -77,24 +77,40 @@ class Stack:
         self.inc_sp()
 
     def pop(seg, i):
-        if seg == 'constant':
+        if seg in self.segments:
+            # there might be a more efficient way to do this, but for now use the virtual register R13 to store seg + i
             out.writelines([
+                # calculate offseted segment location, and then store for later
+                '@{}'.format(i),
+                'D=A',
+                '@{}'.format(self.segments[seg]),
+                'D=D+A',
+                '@R13',
+                'M=D',
+                # load value from SP
                 '@SP',
                 'D=M',
-                '@{}'.format(i)
+                # retrieve and use address previously calculated
+                '@R13',
+                'A=M',
                 'M=D'
-            ])
-        elif seg in self.segments:
-            out.writelines([
             ])
         elif seg == 'static': # assembly variables are static (16-255)
             out.writelines([
+                '@SP',
+                'D=M',
+                '@static.{}'.format(i),
+                'M=D'
             ])
         elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
             if i == '0': seg = 'this'
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
             out.writelines([
+                '@SP',
+                'D=M',
+                '@{}'.format(self.segments(seg)),
+                'M=D'
             ])
         self.dec_sp()
         
