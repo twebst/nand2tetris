@@ -20,21 +20,43 @@ class Stack:
             'temp': 'TEMP'
         }
 
-    def inc_sp():
+        self.arops = {
+            'add': '+',
+            'sub': '-',
+            'and': '&',
+            'or': '|'
+        }
+
+        self.comp = {
+            'eq': 'JEQ',
+            'gt': 'JGT',
+            'lt': 'JLT'
+        }
+
+        self.unop = set(['neg', 'not'])
+
+        self.label_count = 0
+
+    def generate_label(self):
+        l = self.label_count
+        self.label_count += 1
+        return 'L{}'.format(l)
+
+    def inc_sp(self):
         out.writeline([
             '// increment sp',
             '@SP',
             'M=M+1'
         ])
 
-    def dec_sp():
+    def dec_sp(self):
         out.writeline([
             '// decrement sp',
             '@SP',
             'M=M-1'
         ])
 
-    def push(seg, i):
+    def push(self, seg, i):
         if seg == 'constant':
             out.writelines([
                 # load a constant into the current SP RAM location
@@ -43,6 +65,7 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
+
         elif seg in self.segments:
             out.writelines([
                 # offset with the segment address, load value into data register
@@ -55,6 +78,7 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
+
         elif seg == 'static': # assembly variables are static (16-255)
             out.writelines([
                 '@static.{}'.format(i),
@@ -62,6 +86,7 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
+
         elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
             if i == '0': seg = 'this'
             elif i == '1': seg = 'that'
@@ -72,11 +97,12 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
+
         else: print('Invalid push! Got: ', seg, i)
 
         self.inc_sp()
 
-    def pop(seg, i):
+    def pop(self, seg, i):
         if seg in self.segments:
             # there might be a more efficient way to do this, but for now use the virtual register R13 to store seg + i
             out.writelines([
@@ -95,6 +121,7 @@ class Stack:
                 'A=M',
                 'M=D'
             ])
+
         elif seg == 'static': # assembly variables are static (16-255)
             out.writelines([
                 '@SP',
@@ -102,6 +129,7 @@ class Stack:
                 '@static.{}'.format(i),
                 'M=D'
             ])
+
         elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
             if i == '0': seg = 'this'
             elif i == '1': seg = 'that'
@@ -112,32 +140,58 @@ class Stack:
                 '@{}'.format(self.segments(seg)),
                 'M=D'
             ])
-        self.dec_sp()
-        
 
-    def operation(op):
-        if op == 'add':
-            pass
-        elif op == 'sub':
-            pass
-        elif op == 'eq':
-            pass
-        elif op == 'gt':
-            pass
-        elif op == 'lt':
-            pass
-        elif op == 'and':
-            pass
-        elif op == 'or':
-            pass
-        elif op == 'neg':
-            pass
-        elif op == 'not':
-            pass
+        self.dec_sp()
+
+    def operation(self, op):
+        if op in self.arops:
+            out.writelines([
+                '@SP',
+                'M=M-1',
+                'A=M',
+                'D=M',
+                'A=A-1',
+            ])
+
+            if op == 'sub': out.writeline('D=M-D')
+            else: out.writeline('D=D{}M'.format(self.binops[op]))
+            out.writeline('M=D')
+
+        elif op in self.cops:
+            # x < y, x > y, and x == y are all JMP instructions, based on the result of x - y
+            l1 = self.generate_label()
+            l2 = self.generate_label()
+            out.writelines([
+                '@SP',
+                'M=M-1',
+                'A=M',
+                'D=M',
+                'A=A-1',
+                'D=M-D',
+                '@{}'.format(l1),
+                'D;{}'.format(cops[op]),
+                '@SP',
+                'A=M',
+                'M=0',
+                '@{}'.format(l2),
+                '0;JMP',
+                '({})'.format(l1),
+                '@SP',
+                'A=M',
+                'M=1',
+                '({})'.format(l2),
+            ])
+
+        elif op in self.unop:
+            out.writelines([
+                '@SP',
+                'A=M-1',
+                'M={}M'.format('!' if op == 'not' else '-'),
+            ])
         else:
             print('INVALID OP!', op)
 
-    def translate_line(line):
+    def translate_line(self, line):
         self.out.write("// {}".format(line)); # add a comment for each vm instruction
         tokens = line.split()
         if tokens[0] == 'push':
