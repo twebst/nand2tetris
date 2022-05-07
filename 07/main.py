@@ -43,14 +43,14 @@ class Stack:
         return 'L{}'.format(l)
 
     def inc_sp(self):
-        out.writeline([
+        self.out.writeline([
             '// increment sp',
             '@SP',
             'M=M+1'
         ])
 
     def dec_sp(self):
-        out.writeline([
+        self.out.writeline([
             '// decrement sp',
             '@SP',
             'M=M-1'
@@ -58,7 +58,7 @@ class Stack:
 
     def push(self, seg, i):
         if seg == 'constant':
-            out.writelines([
+            self.out.writelines([
                 # load a constant into the current SP RAM location
                 '@{}'.format(i),
                 'D=A',
@@ -67,7 +67,7 @@ class Stack:
             ])
 
         elif seg in self.segments:
-            out.writelines([
+            self.out.writelines([
                 # offset with the segment address, load value into data register
                 '@{}'.format(self.segments(seg)),
                 'D=A',
@@ -80,7 +80,7 @@ class Stack:
             ])
 
         elif seg == 'static': # assembly variables are static (16-255)
-            out.writelines([
+            self.out.writelines([
                 '@static.{}'.format(i),
                 'D=M',
                 '@SP',
@@ -91,7 +91,7 @@ class Stack:
             if i == '0': seg = 'this'
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
-            out.writelines([
+            self.out.writelines([
                 '@{}'.format(self.segments(seg)),
                 'D=M',
                 '@SP',
@@ -105,7 +105,7 @@ class Stack:
     def pop(self, seg, i):
         if seg in self.segments:
             # there might be a more efficient way to do this, but for now use the virtual register R13 to store seg + i
-            out.writelines([
+            self.out.writelines([
                 # calculate offseted segment location, and then store for later
                 '@{}'.format(i),
                 'D=A',
@@ -123,7 +123,7 @@ class Stack:
             ])
 
         elif seg == 'static': # assembly variables are static (16-255)
-            out.writelines([
+            self.out.writelines([
                 '@SP',
                 'D=M',
                 '@static.{}'.format(i),
@@ -134,7 +134,7 @@ class Stack:
             if i == '0': seg = 'this'
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
-            out.writelines([
+            self.out.writelines([
                 '@SP',
                 'D=M',
                 '@{}'.format(self.segments(seg)),
@@ -145,7 +145,7 @@ class Stack:
 
     def operation(self, op):
         if op in self.arops:
-            out.writelines([
+            self.out.writelines([
                 '@SP',
                 'M=M-1',
                 'A=M',
@@ -153,15 +153,15 @@ class Stack:
                 'A=A-1',
             ])
 
-            if op == 'sub': out.writeline('D=M-D')
-            else: out.writeline('D=D{}M'.format(self.binops[op]))
-            out.writeline('M=D')
+            if op == 'sub': self.out.writeline('D=M-D')
+            else: self.out.writeline('D=D{}M'.format(self.binops[op]))
+            self.out.writeline('M=D')
 
         elif op in self.cops:
             # x < y, x > y, and x == y are all JMP instructions, based on the result of x - y
             l1 = self.generate_label()
             l2 = self.generate_label()
-            out.writelines([
+            self.out.writelines([
                 '@SP',
                 'M=M-1',
                 'A=M',
@@ -183,7 +183,7 @@ class Stack:
             ])
 
         elif op in self.unop:
-            out.writelines([
+            self.out.writelines([
                 '@SP',
                 'A=M-1',
                 'M={}M'.format('!' if op == 'not' else '-'),
@@ -192,7 +192,7 @@ class Stack:
             print('INVALID OP!', op)
 
     def translate_line(self, line):
-        self.out.write("// {}".format(line)); # add a comment for each vm instruction
+        # self.out.writeline("// {}".format(line)); # add a comment for each vm instruction
         tokens = line.split()
         if tokens[0] == 'push':
             self.push(tokens[0], tokens[1])
@@ -201,6 +201,14 @@ class Stack:
         else:
             self.operation(tokens[0))
 
+    def infinite_loop(self):
+        l = self.generate_label()
+        self.out.writelines([
+            '@{}'.format(l),
+            '({})'.format(l),
+            '0;JMP'
+        ])
+
 if __name__ == '__main__':
     result = open(output)
     s = Stack(result)
@@ -208,5 +216,6 @@ if __name__ == '__main__':
         line = f.readline()
         while line:
             s.translate_line(line)
+        s.infinite_loop()
 
     result.close()
