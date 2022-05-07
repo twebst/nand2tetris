@@ -1,22 +1,26 @@
 #!/usr/bin/python
+import os
+import sys
+import traceback
+
 class Stack:
     def __init__(self, output):
-        self.sp = 256
         self.out = output
 
         # init the SP to 256 with the following hack instructions
-        out.writelines([
-            '@256',
-            'D=A'
-            '@SP'
-            'M=D'
+        self.out.writelines([
+            '// init SP to 256\n',
+            '@256\n',
+            'D=A\n',
+            '@SP\n',
+            'M=D\n'
         ])
 
         self.segments = {
             'local': 'LCL',
             'argument': 'ARG',
             'this': 'THIS',
-            'that': 'THAT'
+            'that': 'THAT',
             'temp': 'TEMP'
         }
 
@@ -33,6 +37,12 @@ class Stack:
             'lt': 'JLT'
         }
 
+        self.comp_opp = {
+            'eq': 'JNE',
+            'gt': 'JLE',
+            'lt': 'JGE'
+        }
+
         self.unop = set(['neg', 'not'])
 
         self.label_count = 0
@@ -43,48 +53,54 @@ class Stack:
         return 'L{}'.format(l)
 
     def inc_sp(self):
-        self.out.writeline([
-            '// increment sp',
-            '@SP',
-            'M=M+1'
+        self.out.writelines([
+            '// increment sp\n',
+            '@SP\n',
+            'M=M+1\n'
         ])
 
     def dec_sp(self):
-        self.out.writeline([
-            '// decrement sp',
-            '@SP',
-            'M=M-1'
+        self.out.writelines([
+            '// decrement sp\n',
+            '@SP\n',
+            'M=M-1\n'
         ])
 
     def push(self, seg, i):
         if seg == 'constant':
             self.out.writelines([
                 # load a constant into the current SP RAM location
-                '@{}'.format(i),
-                'D=A',
-                '@SP',
-                'M=D'
+                '\n// push constant\n',
+                '@{}\n'.format(i),
+                'D=A\n',
+                '@SP\n',
+                'A=M\n',
+                'M=D\n'
             ])
 
         elif seg in self.segments:
             self.out.writelines([
                 # offset with the segment address, load value into data register
-                '@{}'.format(self.segments(seg)),
-                'D=A',
-                '@{}'.format(i),
-                'A=A+D',
-                'D=M',
+                '\n// push segment: {} + {}\n'.format(seg, i),
+                '@{}\n'.format(self.segments[seg]),
+                'D=A\n',
+                '@{}\n'.format(i),
+                'A=A+D\n',
+                'D=M\n',
                 # load into SP location
-                '@SP',
-                'M=D'
+                '@SP\n',
+                'A=M\n',
+                'M=D\n'
             ])
 
         elif seg == 'static': # assembly variables are static (16-255)
             self.out.writelines([
-                '@static.{}'.format(i),
-                'D=M',
-                '@SP',
-                'M=D'
+                '\n// push static\n',
+                '@static.{}\n'.format(i),
+                'D=M\n',
+                '@SP\n',
+                'A=M\n',
+                'M=D\n'
             ])
 
         elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
@@ -92,10 +108,12 @@ class Stack:
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
             self.out.writelines([
-                '@{}'.format(self.segments(seg)),
-                'D=M',
-                '@SP',
-                'M=D'
+                '\n// push pointer THIS or THAT\n',
+                '@{}\n'.format(self.segments[seg]),
+                'D=M\n',
+                '@SP\n',
+                'A=M\n',
+                'M=D\n'
             ])
 
         else: print('Invalid push! Got: ', seg, i)
@@ -106,28 +124,32 @@ class Stack:
         if seg in self.segments:
             # there might be a more efficient way to do this, but for now use the virtual register R13 to store seg + i
             self.out.writelines([
+                '\n// pop to segment: {} + {}\n'.format(seg, i),
                 # calculate offseted segment location, and then store for later
-                '@{}'.format(i),
-                'D=A',
-                '@{}'.format(self.segments[seg]),
-                'D=D+A',
-                '@R13',
-                'M=D',
+                '@{}\n'.format(i),
+                'D=A\n',
+                '@{}\n'.format(self.segments[seg]),
+                'D=D+A\n',
+                '@R13\n',
+                'M=D\n',
                 # load value from SP
-                '@SP',
-                'D=M',
+                '@SP\n',
+                'A=M\n',
+                'D=M\n',
                 # retrieve and use address previously calculated
-                '@R13',
-                'A=M',
-                'M=D'
+                '@R13\n',
+                'A=M\n',
+                'M=D\n'
             ])
 
         elif seg == 'static': # assembly variables are static (16-255)
             self.out.writelines([
-                '@SP',
-                'D=M',
-                '@static.{}'.format(i),
-                'M=D'
+                '\n// pop to static\n',
+                '@SP\n',
+                'A=M\n',
+                'D=M\n',
+                '@static.{}\n'.format(i),
+                'M=D\n'
             ])
 
         elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
@@ -135,10 +157,12 @@ class Stack:
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
             self.out.writelines([
-                '@SP',
-                'D=M',
-                '@{}'.format(self.segments(seg)),
-                'M=D'
+                '\n// pop to pointer THIS or THAT\n',
+                '@SP\n',
+                'A=M\n',
+                'D=M\n',
+                '@{}\n'.format(self.segments[seg]),
+                'M=D\n'
             ])
 
         self.dec_sp()
@@ -146,76 +170,103 @@ class Stack:
     def operation(self, op):
         if op in self.arops:
             self.out.writelines([
-                '@SP',
-                'M=M-1',
-                'A=M',
-                'D=M',
-                'A=A-1',
+                '\n// {}\n'.format(op),
+                '@SP\n',
+                'M=M-1\n',
+                'A=M\n',
+                'D=M\n',
+                'A=A-1\n',
             ])
 
-            if op == 'sub': self.out.writeline('D=M-D')
-            else: self.out.writeline('D=D{}M'.format(self.binops[op]))
-            self.out.writeline('M=D')
+            if op == 'sub': self.out.writelines(['D=M-D\n'])
+            else: self.out.writelines(['D=D{}M\n'.format(self.arops[op])])
+            self.out.writelines(['M=D\n'])
 
-        elif op in self.cops:
+        elif op in self.comp:
             # x < y, x > y, and x == y are all JMP instructions, based on the result of x - y
             l1 = self.generate_label()
             l2 = self.generate_label()
             self.out.writelines([
-                '@SP',
-                'M=M-1',
-                'A=M',
-                'D=M',
-                'A=A-1',
-                'D=M-D',
-                '@{}'.format(l1),
-                'D;{}'.format(cops[op]),
-                '@SP',
-                'A=M',
-                'M=0',
-                '@{}'.format(l2),
-                '0;JMP',
-                '({})'.format(l1),
-                '@SP',
-                'A=M',
-                'M=1',
-                '({})'.format(l2),
+                '\n// {}\n'.format(op),
+                '@SP\n',
+                'M=M-1\n',
+                'A=M\n',
+                'D=M\n',
+                'A=A-1\n',
+                'D=M-D\n',
+                '@SP\n',
+                'A=M-1\n',
+                'M=0\n',
+                '@{}\n'.format(l1),
+                'D;{}\n'.format(self.comp_opp[op]),
+                '@SP\n',
+                'M=M-1\n',
+                '({})\n'.format(l1),
             ])
 
         elif op in self.unop:
             self.out.writelines([
-                '@SP',
-                'A=M-1',
-                'M={}M'.format('!' if op == 'not' else '-'),
+                '\n// {}\n'.format(op),
+                '@SP\n',
+                'A=M-1\n',
+                'M={}M\n'.format('!' if op == 'not' else '-'),
             ])
-        else:
-            print('INVALID OP!', op)
+
+        else: print('INVALID OP!', op)
 
     def translate_line(self, line):
-        # self.out.writeline("// {}".format(line)); # add a comment for each vm instruction
+        # self.out.writelines("// {}".format(line)); # add a comment for each vm instruction
         tokens = line.split()
         if tokens[0] == 'push':
-            self.push(tokens[0], tokens[1])
+            self.push(tokens[1], tokens[2])
         elif tokens[0] == 'pop':
-            self.pop(tokens[0], tokens[1])
+            self.pop(tokens[1], tokens[2])
         else:
-            self.operation(tokens[0))
+            self.operation(tokens[0])
 
     def infinite_loop(self):
         l = self.generate_label()
         self.out.writelines([
-            '@{}'.format(l),
-            '({})'.format(l),
-            '0;JMP'
+            '\n// END (infinite loop)\n',
+            '@{}\n'.format(l),
+            '({})\n'.format(l),
+            '0;JMP\n'
         ])
 
 if __name__ == '__main__':
-    result = open(output)
-    s = Stack(result)
-    with open(file) as f:
-        line = f.readline()
-        while line:
-            s.translate_line(line)
-        s.infinite_loop()
+    def ignore(line): return not line or line.startswith('//')
 
-    result.close()
+    if len(sys.argv) < 2:
+        print('Input file expected! Received no arguments.')
+    else:
+        try:
+            in_path = os.path.abspath(sys.argv[1])
+            out_path = '{}.asm'.format(in_path.split('.')[0])
+            inp = open(in_path, 'r')
+            out = open(out_path, 'w')
+
+            s = Stack(out)
+            l_num = 0
+            lines = list(filter(lambda l: not ignore(l), map(lambda l: l.strip(), inp.readlines())))
+            inp.close()
+
+            for line in lines:
+                s.translate_line(line)
+                l_num += 1
+            s.infinite_loop()
+
+            # with inp as f:
+            #     while True:
+            #         line = f.readline().strip()
+            #         if not line: break
+            #         if not line.startswith('//'): s.translate_line(line)
+            #         l_num += 1
+            #     s.infinite_loop()
+
+            out.close()
+        except Exception as e:
+            print('Failed at line:', l_num, line)
+            traceback.print_exception(type(e), e, e.__traceback__)
+        finally:
+            if inp: inp.close()
+            if out: out.close()
