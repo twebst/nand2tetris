@@ -12,6 +12,14 @@ class Stack:
             'M=D'
         ])
 
+        self.segments = {
+            'local': 'LCL',
+            'argument': 'ARG',
+            'this': 'THIS',
+            'that': 'THAT'
+            'temp': 'TEMP'
+        }
+
     def inc_sp():
         out.writeline([
             '// increment sp',
@@ -35,10 +43,10 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
-        else:
+        elif seg in self.segments:
             out.writelines([
                 # offset with the segment address, load value into data register
-                '@{}'.format(get_loc(seg[0])),
+                '@{}'.format(self.segments(seg)),
                 'D=A',
                 '@{}'.format(i),
                 'A=A+D',
@@ -47,12 +55,47 @@ class Stack:
                 '@SP',
                 'M=D'
             ])
+        elif seg == 'static': # assembly variables are static (16-255)
+            out.writelines([
+                '@static.{}'.format(i),
+                'D=M',
+                '@SP',
+                'M=D'
+            ])
+        elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
+            if i == '0': seg = 'this'
+            elif i == '1': seg = 'that'
+            else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
+            out.writelines([
+                '@{}'.format(self.segments(seg)),
+                'D=M',
+                '@SP',
+                'M=D'
+            ])
+        else: print('Invalid push! Got: ', seg, i)
+
         self.inc_sp()
 
     def pop(seg, i):
-        out.writelines([
-            s
-        ])
+        if seg == 'constant':
+            out.writelines([
+                '@SP',
+                'D=M',
+                '@{}'.format(i)
+                'M=D'
+            ])
+        elif seg in self.segments:
+            out.writelines([
+            ])
+        elif seg == 'static': # assembly variables are static (16-255)
+            out.writelines([
+            ])
+        elif seg == 'pointer': # pointer 0 and 1 are aliases to THIS and THAT respectively
+            if i == '0': seg = 'this'
+            elif i == '1': seg = 'that'
+            else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
+            out.writelines([
+            ])
         self.dec_sp()
         
 
@@ -88,11 +131,12 @@ class Stack:
         else:
             self.operation(tokens[0))
 
-result = open(output)
-s = Stack(result)
-with open(file) as f:
-    line = f.readline()
-    while line:
-        s.translate_line(line)
+if __name__ == '__main__':
+    result = open(output)
+    s = Stack(result)
+    with open(file) as f:
+        line = f.readline()
+        while line:
+            s.translate_line(line)
 
-result.close()
+    result.close()
