@@ -4,8 +4,9 @@ import sys
 import traceback
 
 class Stack:
-    def __init__(self, output):
+    def __init__(self, output, name):
         self.out = output
+        self.name = name
 
         # init the SP to 256 with the following hack instructions
         self.out.writelines([
@@ -34,12 +35,6 @@ class Stack:
             'eq': 'JEQ',
             'gt': 'JGT',
             'lt': 'JLT'
-        }
-
-        self.comp_opp = {
-            'eq': 'JNE',
-            'gt': 'JLE',
-            'lt': 'JGE'
         }
 
         self.unop = set(['neg', 'not'])
@@ -104,9 +99,8 @@ class Stack:
 
         elif seg == 'static': # assembly variables are static (16-255)
             self.out.writelines([
-                '\n// push static\n',
-                '@static.{}\n'.format(i),
-                # '@{}\n'.format(17 + int(i)),
+                '\n// push static {}\n',
+                '@{}.{}\n'.format(self.name, i),
                 'D=M\n',
                 '@SP\n',
                 'A=M\n',
@@ -118,9 +112,8 @@ class Stack:
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
             self.out.writelines([
-                '\n// push pointer THIS or THAT\n',
+                '\n// push pointer {}\n'.format(seg),
                 '@{}\n'.format(self.segments[seg]),
-                'A=M\n',
                 'D=M\n',
                 '@SP\n',
                 'A=M\n',
@@ -168,10 +161,9 @@ class Stack:
             self.out.writelines([
                 '\n// pop to static\n',
                 '@SP\n',
-                'A=M\n',
+                'A=M-1\n',
                 'D=M\n',
-                '@static.{}\n'.format(i),
-                # '@{}\n'.format(17 + int(i)), # 0 offset, static starts at index 17
+                '@{}.{}\n'.format(self.name, i),
                 'M=D\n'
             ])
 
@@ -180,12 +172,11 @@ class Stack:
             elif i == '1': seg = 'that'
             else: print('Invalid pointer segment, expected 0 (THIS) or 1 (THAT)!')
             self.out.writelines([
-                '\n// pop to pointer THIS or THAT\n',
+                '\n// pop to pointer {}\n'.format(seg),
                 '@SP\n',
                 'A=M-1\n',
                 'D=M\n',
                 '@{}\n'.format(self.segments[seg]),
-                'A=M\n',
                 'M=D\n'
             ])
 
@@ -218,14 +209,16 @@ class Stack:
                 'D=M\n',
                 'A=A-1\n',
                 'D=M-D\n',
+                '@{}\n'.format(l1),
+                'D;{}\n'.format(self.comp[op]),
+                '@{}\n'.format(l2),
+                'D=0;JMP\n',
+                '({})\n'.format(l1),
+                'D=-1\n',
+                '({})\n'.format(l2),
                 '@SP\n',
                 'A=M-1\n',
-                'M=0\n',
-                '@{}\n'.format(l1),
-                'D;{}\n'.format(self.comp_opp[op]),
-                '@SP\n',
-                'M=M-1\n',
-                '({})\n'.format(l1),
+                'M=D\n'
             ])
 
         elif op in self.unop:
@@ -266,10 +259,11 @@ if __name__ == '__main__':
         try:
             in_path = os.path.abspath(sys.argv[1])
             out_path = '{}.asm'.format(in_path.split('.')[0])
+            f_name = in_path.split('/')[-1]
             inp = open(in_path, 'r')
             out = open(out_path, 'w')
 
-            s = Stack(out)
+            s = Stack(out, f_name)
             l_num = 0
             lines = list(filter(lambda l: not ignore(l), map(lambda l: l.strip(), inp.readlines())))
             inp.close()
@@ -278,14 +272,6 @@ if __name__ == '__main__':
                 s.translate_line(line)
                 l_num += 1
             s.infinite_loop()
-
-            # with inp as f:
-            #     while True:
-            #         line = f.readline().strip()
-            #         if not line: break
-            #         if not line.startswith('//'): s.translate_line(line)
-            #         l_num += 1
-            #     s.infinite_loop()
 
             out.close()
         except Exception as e:
