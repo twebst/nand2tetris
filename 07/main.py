@@ -21,7 +21,6 @@ class Stack:
             'argument': 'ARG',
             'this': 'THIS',
             'that': 'THAT',
-            'temp': 'TEMP'
         }
 
         self.arops = {
@@ -78,12 +77,22 @@ class Stack:
                 'M=D\n'
             ])
 
+        elif seg == 'temp':
+            self.out.writelines([
+                '\n// push temp (5) + {}\n'.format(i),
+                '@{}\n'.format(5 + int(i)),
+                'D=M\n',
+                '@SP\n',
+                'A=M\n',
+                'M=D\n'
+            ])
+
         elif seg in self.segments:
             self.out.writelines([
                 # offset with the segment address, load value into data register
                 '\n// push segment: {} + {}\n'.format(seg, i),
                 '@{}\n'.format(self.segments[seg]),
-                'D=A\n',
+                'D=M\n',
                 '@{}\n'.format(i),
                 'A=A+D\n',
                 'D=M\n',
@@ -97,6 +106,7 @@ class Stack:
             self.out.writelines([
                 '\n// push static\n',
                 '@static.{}\n'.format(i),
+                # '@{}\n'.format(17 + int(i)),
                 'D=M\n',
                 '@SP\n',
                 'A=M\n',
@@ -110,6 +120,7 @@ class Stack:
             self.out.writelines([
                 '\n// push pointer THIS or THAT\n',
                 '@{}\n'.format(self.segments[seg]),
+                'A=M\n',
                 'D=M\n',
                 '@SP\n',
                 'A=M\n',
@@ -121,7 +132,18 @@ class Stack:
         self.inc_sp()
 
     def pop(self, seg, i):
-        if seg in self.segments:
+        if seg == 'temp':
+            self.out.writelines([
+                '\n// pop to temp (5) + {}\n'.format(i),
+                '@SP\n',
+                'A=M-1\n',
+                'D=M\n',
+                '@{}\n'.format(5 + int(i)),
+                'M=D\n'
+            ])
+                
+
+        elif seg in self.segments:
             # there might be a more efficient way to do this, but for now use the virtual register R13 to store seg + i
             self.out.writelines([
                 '\n// pop to segment: {} + {}\n'.format(seg, i),
@@ -129,12 +151,12 @@ class Stack:
                 '@{}\n'.format(i),
                 'D=A\n',
                 '@{}\n'.format(self.segments[seg]),
-                'D=D+A\n',
+                'D=D+M\n',
                 '@R13\n',
                 'M=D\n',
                 # load value from SP
                 '@SP\n',
-                'A=M\n',
+                'A=M-1\n',
                 'D=M\n',
                 # retrieve and use address previously calculated
                 '@R13\n',
@@ -149,6 +171,7 @@ class Stack:
                 'A=M\n',
                 'D=M\n',
                 '@static.{}\n'.format(i),
+                # '@{}\n'.format(17 + int(i)), # 0 offset, static starts at index 17
                 'M=D\n'
             ])
 
@@ -159,9 +182,10 @@ class Stack:
             self.out.writelines([
                 '\n// pop to pointer THIS or THAT\n',
                 '@SP\n',
-                'A=M\n',
+                'A=M-1\n',
                 'D=M\n',
                 '@{}\n'.format(self.segments[seg]),
+                'A=M\n',
                 'M=D\n'
             ])
 
