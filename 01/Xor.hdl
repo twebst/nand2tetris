@@ -11,7 +11,8 @@ CHIP Xor {
     OUT out;
 
     PARTS:
-// 9 NANDs
+
+// 9 Nand
 /*
     Not(in=a, out=na);
     Not(in=b, out=nb);
@@ -20,7 +21,7 @@ CHIP Xor {
     Or(a=a1, b=a2, out=out);
 */
 
-// 5 NANDs
+// 5 Nand
 /*
     Not(in=a, out=na);
     Not(in=b, out=nb);
@@ -29,7 +30,7 @@ CHIP Xor {
     Nand(a=o1, b=o2, out=out);
 */
 
-// 4 NANDs
+// 4 Nand
     Nand(a=a, b=b, out=nab);
     Nand(a=a, b=nab, out=o1);
     Nand(a=nab, b=b, out=o2);
